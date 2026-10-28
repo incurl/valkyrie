@@ -256,6 +256,17 @@ The end-to-end check runs the whole pipeline without a GUI: it applies the
 schema, submits a job, runs the stub runner, stores an artifact and
 fetches it back through PocketBase's file route.
 
+## Documentation
+
+| Document | Read it for |
+| --- | --- |
+| [docs/architecture.md](docs/architecture.md) | Why the pieces are shaped the way they are |
+| [docs/porting.md](docs/porting.md) | The checklist for taking this template to a new application |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | The failures that cost time, and what fixes them |
+| [CONTEXT.md](CONTEXT.md) | The vocabulary: what each term means, and what it does not |
+| [AGENTS.md](AGENTS.md) | The working rules for AI coding agents |
+| [.agents/skills/](.agents/skills) | Task-scoped procedures: new application, backend method, migration, frontend panel, release |
+
 ## Licence
 
 Valkyrie is MIT licensed. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)

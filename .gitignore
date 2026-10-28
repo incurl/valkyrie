@@ -24,4 +24,7 @@ coverage.*
 # Editor / OS
 .idea/
 .DS_Store
+
+# Python
 __pycache__/
+*.pyc
