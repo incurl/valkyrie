@@ -88,8 +88,13 @@ Three things to get right:
 - **Normalise the nullables here, not in the components.** The generator types a missing array as `string[] | null`. The backend
   always sends an array, so narrow it once at the boundary:
   ```ts
-  export type Job = JobsModels.Job & { artifact_ids: string[] };
+  export type Job = JobsModels.Job & {
+    artifact_ids: string[];
+    input_artifact_ids: string[];
+  };
   ```
+- **A job has two artifact lists.** `artifact_ids` are the outputs, `input_artifact_ids` are the inputs. A retry re-uses the
+  inputs and leaves the outputs with the job that produced them.
 - **Export the model types** the components need, from the same file.
 
 ## 4. Use it in a component

@@ -137,6 +137,33 @@ function App() {
     },
   });
 
+  // The credentials and the interface preferences are saved through
+  // mutations, so that a failure is reported instead of becoming an
+  // unhandled rejection.
+  const saveCredentialsMutation = useMutation({
+    mutationFn: ({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) =>
+      api.saveCredentials(apiKey, baseUrl),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['settings'] });
+      notify('The settings were saved.', 'success');
+      setSettingsOpen(false);
+    },
+    onError: (error: Error) => {
+      notify(`The settings could not be saved: ${error.message}`, 'error');
+    },
+  });
+
+  const saveUIMutation = useMutation({
+    mutationFn: (ui: { zoom: number; theme: string }) => api.saveUI(ui),
+    onSuccess: (_data, ui) => {
+      void queryClient.invalidateQueries({ queryKey: ['settings'] });
+      applyZoom(ui.zoom);
+    },
+    onError: (error: Error) => {
+      notify(`The zoom could not be saved: ${error.message}`, 'error');
+    },
+  });
+
   // The zoom is restored as soon as the settings are known.
   useEffect(() => {
     if (settingsQuery.data) {
@@ -229,17 +256,10 @@ function App() {
         settings={settingsQuery.data ?? null}
         onClose={() => setSettingsOpen(false)}
         onSave={(apiKey, baseUrl) => {
-          void api.saveCredentials(apiKey, baseUrl).then(() => {
-            void queryClient.invalidateQueries({ queryKey: ['settings'] });
-            notify('The settings were saved.', 'success');
-            setSettingsOpen(false);
-          });
+          saveCredentialsMutation.mutate({ apiKey, baseUrl });
         }}
         onSaveUI={(ui) => {
-          void api.saveUI(ui).then(() => {
-            void queryClient.invalidateQueries({ queryKey: ['settings'] });
-            applyZoom(ui.zoom);
-          });
+          saveUIMutation.mutate(ui);
         }}
       />
 

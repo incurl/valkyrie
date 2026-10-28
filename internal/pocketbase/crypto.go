@@ -46,6 +46,13 @@ func NewCipher(dataDir string) (*Cipher, error) {
 		if err := os.WriteFile(keyPath, key, 0o600); err != nil {
 			return nil, fmt.Errorf("write encryption key: %w", err)
 		}
+	} else {
+		// The mode of an existing file is left alone by WriteFile, and
+		// the file may have been copied or restored with looser
+		// permissions. The key must not be readable by anyone else.
+		if err := os.Chmod(keyPath, 0o600); err != nil {
+			return nil, fmt.Errorf("secure the encryption key: %w", err)
+		}
 	}
 
 	if len(key) != 32 {

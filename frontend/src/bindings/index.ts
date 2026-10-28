@@ -25,6 +25,7 @@ export type Job = JobsModels.Job & {
   // typed as nullable. The backend always sends an array, so it is
   // normalised here.
   artifact_ids: string[];
+  input_artifact_ids: string[];
   params: Record<string, unknown>;
   result: Record<string, unknown>;
 };

@@ -135,6 +135,7 @@ jobManager := jobs.NewManager(
     pbService.App(),
     jobs.WithEmitter(bridge),
     jobs.WithLog(consoleLog),
+    jobs.WithTimeout(5 * time.Minute),   // if the default 30 minutes is too long
     jobs.WithRunnerFunc(func() jobs.Runner {
         return runner.NewMyRunner()
     }),
@@ -142,7 +143,11 @@ jobManager := jobs.NewManager(
 ```
 
 **Honour `ctx`.** It is the only way a cancelled job stops. A runner that ignores it keeps a slot in the bounded queue, and
-every later job waits behind it.
+every later job waits behind it. The context also carries the job's time limit, so a runner that blocks forever is stopped
+even if the user does nothing.
+
+**The manager already handles the rest.** A job interrupted by a crash is reconciled at startup, and the Wails `OnShutdown`
+hook stops the running jobs when the window closes. Neither needs anything from the runner.
 
 ## 4. Make the parameters real
 

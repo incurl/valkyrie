@@ -296,12 +296,10 @@ func (m *Manager) linkArtifacts(jobID string, artifactIDs []string) error {
 		}
 
 		// The artifact belongs to another job: copy it, so that both
-		// jobs can refer to the same bytes.
-		copied, err := m.copyArtifact(record, jobID)
-		if err != nil {
+		// jobs keep their own.
+		if _, err := m.copyArtifact(record, jobID); err != nil {
 			return fmt.Errorf("copy artifact %q: %w", artifactID, err)
 		}
-		_ = copied
 	}
 	return nil
 }
@@ -444,15 +442,9 @@ func (m *Manager) ListJobs(limit int) ([]Job, error) {
 		return nil, fmt.Errorf("list jobs: %w", err)
 	}
 
-	jobs := make([]Job, 0, len(records))
-	for _, record := range records {
-		job, err := m.toJob(record)
-		if err != nil {
-			return nil, err
-		}
-		jobs = append(jobs, job)
-	}
-	return jobs, nil
+	// The jobs of the whole page are converted at once, so that the
+	// artifacts are fetched in a single query instead of one per job.
+	return m.toJobs(records)
 }
 
 // GetJob returns a single job.
@@ -663,7 +655,117 @@ func (m *Manager) emitRecord(record *core.Record) {
 }
 
 // toJob converts a PocketBase record into the frontend-facing job.
+//
+// It collects the artifacts of the job with a query of its own. Use
+// toJobs when several jobs are converted at once: it fetches the
+// artifacts of the whole page in a single query.
 func (m *Manager) toJob(record *core.Record) (Job, error) {
+	job, err := recordToJob(record)
+	if err != nil {
+		return Job{}, err
+	}
+
+	artifacts, err := m.artifactsOfJobs([]string{record.Id})
+	if err != nil {
+		return Job{}, err
+	}
+	job.ArtifactIDs, job.InputArtifactIDs = splitArtifacts(artifacts[record.Id])
+
+	return job, nil
+}
+
+// toJobs converts several PocketBase records into the frontend-facing
+// jobs, fetching the artifacts of the whole page in a single query.
+//
+// Without it, a page of N jobs costs N+1 queries, because each job
+// collects its artifacts on its own. The frontend polls this every five
+// seconds, so the difference grows with the history.
+func (m *Manager) toJobs(records []*core.Record) ([]Job, error) {
+	if len(records) == 0 {
+		return []Job{}, nil
+	}
+
+	jobIDs := make([]string, 0, len(records))
+	for _, record := range records {
+		jobIDs = append(jobIDs, record.Id)
+	}
+
+	// One query for the artifacts of the whole page. A failure here is
+	// not fatal: the jobs are still listed, just without their
+	// artifacts.
+	artifacts, artifactsErr := m.artifactsOfJobs(jobIDs)
+
+	jobs := make([]Job, 0, len(records))
+	for _, record := range records {
+		job, err := recordToJob(record)
+		if err != nil {
+			return nil, err
+		}
+		if artifactsErr == nil {
+			job.ArtifactIDs, job.InputArtifactIDs = splitArtifacts(artifacts[record.Id])
+		}
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+}
+
+// artifactsOfJobs fetches the artifacts of several jobs in one query.
+//
+// The artifacts are returned per job id, in the order they were
+// created, newest first.
+func (m *Manager) artifactsOfJobs(jobIDs []string) (map[string][]*core.Record, error) {
+	byJob := map[string][]*core.Record{}
+	if len(jobIDs) == 0 {
+		return byJob, nil
+	}
+
+	values := make([]any, 0, len(jobIDs))
+	for _, id := range jobIDs {
+		values = append(values, id)
+	}
+
+	// The ORM query is used, rather than a raw one, so that the
+	// records are scanned with their collection context. A raw query
+	// panics in PostScan, because the record has no collection.
+	records := []*core.Record{}
+	err := m.app.RecordQuery(CollectionArtifacts).
+		Where(dbx.In("job", values...)).
+		OrderBy("created DESC").
+		All(&records)
+	if err != nil {
+		return nil, fmt.Errorf("find the artifacts: %w", err)
+	}
+
+	for _, record := range records {
+		jobID := record.GetString("job")
+		byJob[jobID] = append(byJob[jobID], record)
+	}
+	return byJob, nil
+}
+
+// splitArtifacts divides the artifacts of a job into its outputs and
+// its inputs.
+//
+// The inputs and the outputs are kept apart, because a retry re-uses
+// the inputs while the outputs stay with the job that produced them.
+func splitArtifacts(records []*core.Record) (outputs []string, inputs []string) {
+	outputs = []string{}
+	inputs = []string{}
+
+	for _, record := range records {
+		if record.GetString("kind") == ArtifactKindInput {
+			inputs = append(inputs, record.Id)
+			continue
+		}
+		outputs = append(outputs, record.Id)
+	}
+	return outputs, inputs
+}
+
+// recordToJob converts a PocketBase record into the frontend-facing
+// job, without collecting its artifacts.
+func recordToJob(record *core.Record) (Job, error) {
 	job := Job{
 		ID:               record.Id,
 		Title:            record.GetString("title"),
@@ -698,28 +800,6 @@ func (m *Manager) toJob(record *core.Record) (Job, error) {
 
 	if code := record.GetInt("error_code"); code != 0 {
 		job.ErrorCode = code
-	}
-
-	// Collect the artifacts of the job. The inputs and the outputs are
-	// kept apart, because a retry re-uses the inputs while the outputs
-	// stay with the job that produced them.
-	records, err := m.app.FindRecordsByFilter(
-		CollectionArtifacts,
-		"job = {:job}",
-		"-created",
-		100,
-		0,
-		dbx.Params{"job": record.Id},
-	)
-	if err == nil {
-		for _, artifactRecord := range records {
-			id := artifactRecord.Id
-			if artifactRecord.GetString("kind") == ArtifactKindInput {
-				job.InputArtifactIDs = append(job.InputArtifactIDs, id)
-				continue
-			}
-			job.ArtifactIDs = append(job.ArtifactIDs, id)
-		}
 	}
 
 	return job, nil

@@ -12,6 +12,28 @@ which is currently an opt-in build. The **high** issue is a data-loss bug in `Re
 
 ---
 
+## Status
+
+Seven of the eight findings were fixed on 2026-10-28, in the order below. **Finding 1 (the server-mode authentication) is
+still open** — it needs a decision about whether the REST API should be mounted in server mode at all, which is a design
+question rather than a bug.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| 1 | **Critical** | Server mode exposes every job's prompt and params over HTTP with no authentication | **Open** |
+| 2 | **High** | `RetryJob` steals the original job's artifacts | **Fixed** |
+| 3 | **High** | A crash leaves jobs stuck in `running` forever | **Fixed** |
+| 4 | **Medium** | No job timeout | **Fixed** |
+| 5 | **Medium** | No graceful shutdown | **Fixed** |
+| 6 | **Medium** | `ListJobs` is an N+1 query | **Fixed** |
+| 7 | **Low** | A failed settings save is silent | **Fixed** |
+| 8 | **Low** | The key file's mode is not re-asserted | **Fixed** |
+
+The findings below are kept as they were written, so that the reasoning behind each one stays visible. Where a fix changed
+the shape of a problem, the fix is described at the end of the section.
+
+---
+
 ## Summary
 
 | # | Severity | Area | Finding |
@@ -72,6 +94,8 @@ frontend never uses the REST API today, so the public rules are not needed.
 Recommended: make the read rules **superuser-only** (`types.Pointer("")` → unset) and drop the REST mount in server mode
 unless the operator explicitly opts in.
 
+> **Still open.** The fix needs a decision about the shape of server mode, so it was left for a separate change.
+
 ## 2. High — `RetryJob` steals the original job's artifacts
 
 **Where**: `internal/bindings/service.go:142`.
@@ -108,6 +132,14 @@ This is **data loss**, reachable from a single button in the UI.
 **Fix.** The retry must not re-link the original's artifacts. Either drop `InputArtifactIDs` from the retry entirely, or
 collect only the artifacts whose `kind` is `input` and copy them (rather than move them) to the new job.
 
+> **Fixed**, in two layers, because either one alone was enough to lose the data:
+> - The bindings re-use only the **inputs** of the job they repeat (`job.InputArtifactIDs`).
+> - The manager **copies** an artifact that already belongs to another job, instead of moving it. An unowned artifact is
+>   claimed, as before.
+>
+> A job now tracks its inputs and its outputs separately, so the distinction survives in the record. The regression test is
+> `internal/bindings/service_test.go::TestRetryJobKeepsTheOriginalOutputs`.
+
 ## 3. High — a crash leaves jobs stuck in `running` forever
 
 **Where**: `internal/jobs/manager.go:355`.
@@ -127,6 +159,10 @@ The user is stuck: the job shows as running forever, and the delete button refus
 **Fix.** On startup, reconcile the persisted jobs: mark every `pending` or `running` record as `failed` with a "interrupted
 by a restart" message, or re-enqueue it. The first is simpler and safer.
 
+> **Fixed.** `Manager.Reconcile()` marks the interrupted jobs as failed, with the explanation *"The job was interrupted by a
+> restart of the application."*, and it runs at startup in `main.go`. The reconciliation is idempotent. The regression test is
+> `internal/jobs/reconcile_test.go`.
+
 ## 4. Medium — no job timeout
 
 **Where**: `internal/jobs/manager.go:378`.
@@ -145,6 +181,10 @@ which only works if the runner honours the context.
 **Fix.** Add a per-job timeout, configurable, applied with `context.WithTimeout` around the runner call. The runner then
 receives a context that expires on its own.
 
+> **Fixed.** `WithTimeout` sets the limit and `DefaultTimeout` (30 minutes) applies it out of the box. The runner receives a
+> context that expires on its own, and the job is marked as failed with the limit named. The regression test is
+> `internal/jobs/lifecycle_test.go::TestJobTimeoutStopsAHungRunner`.
+
 ## 5. Medium — no graceful shutdown
 
 **Where**: `internal/jobs/manager.go` — the public API has no `Shutdown` method.
@@ -154,6 +194,10 @@ which is the same situation as finding 3, except it happens on every normal quit
 
 **Fix.** Add `Manager.Shutdown(ctx)`: cancel the running jobs, wait for the goroutines to finish (a `sync.WaitGroup`), and
 call it from Wails' `OnShutdown`.
+
+> **Fixed.** `Manager.Shutdown(ctx)` and `ShutdownWithTimeout(timeout)` exist. The Wails `OnShutdown` hook calls it with
+> `jobs.ShutdownTimeout`. The manager's root context is the parent of every job context, so the shutdown stops them all.
+> The regression test is `internal/jobs/lifecycle_test.go::TestShutdownCancelsTheRunningJobs`.
 
 ## 6. Medium — `ListJobs` is an N+1 query, polled every 5 seconds
 
@@ -177,6 +221,17 @@ the cost grows with the table, not with the page.
 **Fix.** Fetch the artifacts for the whole page in one query (`job IN (...)`) and index them by job id. One extra query per
 page instead of one per job.
 
+> **Fixed.** `Manager.toJobs` converts a whole page at once and fetches the artifacts with a single `dbx.In` query, through
+> `app.RecordQuery` so that the records are scanned with their collection context. Measured on the same machine:
+>
+> | Jobs in the table | Before | After |
+> | --- | --- | --- |
+> | 50 | 4.8 ms | 0.9 ms |
+> | 100 | 12.9 ms | 2.0 ms |
+> | 200 | 14.0 ms | 2.8 ms |
+>
+> The regression test is `internal/jobs/listjobs_test.go`.
+
 ## 7. Low — a failed settings save is silent
 
 **Where**: `frontend/src/app/App.tsx:232`.
@@ -190,6 +245,9 @@ no explanation. The same applies to `saveUI`.
 
 **Fix.** Use the `useMutation` pattern the other actions already use, which has an `onError` that notifies.
 
+> **Fixed.** The credentials and the interface preferences are saved through mutations, so a failure produces a toast instead
+> of an unhandled rejection. There is no bare promise chain left in the frontend.
+
 ## 8. Low — the key file's mode is not re-asserted
 
 **Where**: `internal/pocketbase/crypto.go:46`.
@@ -199,6 +257,9 @@ permissions, the mode is left alone. The data directory is created with `0o700`,
 file's own mode should not depend on that.
 
 **Fix.** `os.Chmod(keyPath, 0o600)` after writing, or stat and correct the mode.
+
+> **Fixed.** An existing key file has its mode re-asserted when the cipher is created. The regression test is
+> `internal/pocketbase/crypto_test.go::TestCipherSecuresAnExistingKey`.
 
 ---
 
@@ -240,15 +301,30 @@ The untested functions in `internal/jobs` are `ListArtifacts`, `GetArtifact`, `D
 
 ---
 
-## Suggested order of work
+## What was done
 
-1. **Finding 2** — the data loss. A regression test belongs next to the fix.
-2. **Finding 1** — close the read rules, or require a token in server mode. The Docker image's `0.0.0.0` default makes this
-   urgent for anyone who deploys it.
-3. **Finding 3** — reconcile the orphaned jobs at startup. Without it, every crash leaves the user stuck.
-4. **Findings 4 and 5** — the timeout and the graceful shutdown, together: both need the manager to own a lifecycle.
-5. **Finding 6** — the batched artifact query.
-6. **Findings 7 and 8** — the quick ones.
+The findings were fixed in the order 2, 3, 4, 5, 6, 7, 8. Finding 1 was left open, because it needs a decision about the
+shape of server mode.
 
-Findings 4 and 5 are best done as one change: a `Manager` that owns a `context.Context`, a `sync.WaitGroup` and a timeout
-covers both, and gives the manager the lifecycle it currently lacks.
+**Finding 2** was fixed in two layers, because either one alone was enough to lose the data. The bindings re-use only the
+inputs of the job they repeat, and the manager copies an artifact that already belongs to another job instead of moving it.
+A job now tracks its inputs and its outputs separately.
+
+**Findings 4 and 5** were done together: a `Manager` that owns a root context, a `sync.WaitGroup` and a timeout covers both,
+and gives the manager the lifecycle it lacked.
+
+**Finding 6** needed a raw `dbx.In` query, because the PocketBase search filter has no `IN` operator. It goes through
+`app.RecordQuery`, not `app.DB()`, so the records are scanned with their collection context.
+
+### The remaining work
+
+**Finding 1** — the server-mode authentication — is the one thing left. It is a design decision rather than a bug:
+
+- *Option A*: close the read rules on `jobs` and `artifacts`. The frontend never uses the REST API today (it goes through
+  the Wails bindings), so this costs nothing and the server mode stops exposing the data. The file route needs the same
+  treatment, which means the frontend would fetch the files through a bound method instead of by URL.
+- *Option B*: keep the rules and require a bearer token in server mode. This keeps the REST API usable, which matters if an
+  application wants a separate web client.
+
+Option A is the simpler one and it matches the architecture. Option B is the one to pick if the REST API is part of the
+product.

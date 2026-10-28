@@ -204,16 +204,13 @@ development and testing.
 
 ## Known Rough Edges
 
-0. **The 2026-10-28 audit found eight issues that are still open.** Read [`docs/audit.md`](docs/audit.md) before extending the
-   queue. The two that matter most:
-   - **`RetryJob` steals the original job's artifacts** (`internal/bindings/service.go`), and deleting the retry then deletes the
-     original's files. Do not extend `RetryJob` without fixing it first.
+0. **One issue from the 2026-10-28 audit is still open.** Read [`docs/audit.md`](docs/audit.md) before extending the queue.
    - **Server mode has no authentication.** The `jobs` and `artifacts` collections have public read rules, so anyone who can
      reach the server port can read every prompt and parameter. The desktop app is in-process and unaffected; the container
-     image binds `0.0.0.0` and is affected.
-   - A crash leaves jobs stuck in `running`: never resumed, never deletable. There is no startup reconciliation.
-   - There is no job timeout and no graceful shutdown, so two hung runners halt the application.
-   - `internal/bindings` has **no tests**, which is why the `RetryJob` bug went unnoticed.
+     image binds `0.0.0.0` and is affected. The audit describes the two ways to close it.
+
+   The other seven were fixed: the `RetryJob` data loss, the jobs stranded by a crash, the missing job timeout, the missing
+   graceful shutdown, the N+1 listing query, the silent settings save and the key file's permissions.
 
 1. **`go build ./...` fails on `build/ios`** with `function main is undeclared in the main package`. This is expected: it is a
    separate `main` package behind the `//go:build ios` tag. Build the root package and `./internal/...` instead.

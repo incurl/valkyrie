@@ -68,6 +68,12 @@ domain.
 - **Deletion requires rest.** `DeleteJob` refuses while a job is `pending` or `running`, because a running job would write to
   the database after its record was removed. It deletes the job's artifacts in the same call, so no orphan files are left in
   the storage directory.
+- **A job has a time limit.** The default is 30 minutes. The runner receives a context that expires on its own, so a runner
+  that never returns cannot hold a slot forever. `WithTimeout` changes the limit; zero removes it.
+- **The manager owns a lifecycle.** Its root context is the parent of every job context, so `Shutdown` stops them all at once
+  and waits for them. The Wails `OnShutdown` hook calls it, so quitting the application no longer kills a job mid-write.
+- **The interrupted jobs are reconciled at startup.** A job that was pending or running when the process died is marked as
+  failed with an explanation, so it appears in the history and the user can delete it.
 - **The events are a push, the polling is a net.** The backend emits `job:updated` on every transition. The frontend also
   polls with a React Query `refetchInterval`. The event is the mechanism; the poll is the safety net for a missed event.
 
@@ -112,6 +118,25 @@ access is **closed**, because every write goes through the Go services, where th
 frontend expects, and it is why the frontend never needs write access to the API.
 
 `app_settings` gets no rule at all, which is what keeps it out of reach of the HTTP API.
+
+## The listing is batched
+
+`ListJobs` converts a whole page at once. It fetches the artifacts of the page with a single query, rather than letting each
+job collect its own: without that, a page of N jobs costs N+1 queries, and the frontend polls the listing every five
+seconds.
+
+The query is a raw `dbx.In`, because the PocketBase search filter has no `IN` operator. It goes through `app.RecordQuery`
+rather than `app.DB()`, so that the records are scanned with their collection context — a bare `core.Record` panics in
+`PostScan` without one.
+
+## The inputs and the outputs are separate
+
+An artifact belongs to one job, and it is either an **input** (something the job consumed) or an **output** (something it
+produced). A job tracks the two separately.
+
+This matters because a retry re-uses the inputs of the job it repeats. Moving them would strip the original job of its
+outputs and hand them to the retry, and deleting the retry would then delete files the original still refers to. So the
+manager **copies** an artifact that already belongs to another job, and only claims one that belongs to no job.
 
 ## The frontend talks to Go, not to the database
 
