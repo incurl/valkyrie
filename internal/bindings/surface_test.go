@@ -18,9 +18,6 @@ var expectedMethods = []string{
 	"ClearConsoleEntries",
 	"DeleteArtifact",
 	"DeleteJob",
-	"Describe",
-	"ExportArtifact",
-	"GetJob",
 	"GetSettings",
 	"ListArtifacts",
 	"ListConsoleEntries",
@@ -29,7 +26,6 @@ var expectedMethods = []string{
 	"SaveCredentials",
 	"SaveUI",
 	"SubmitJob",
-	"UploadArtifact",
 }
 
 // TestAppServiceExposesExactlyTheIntendedMethods pins the bound surface.
@@ -74,10 +70,8 @@ func TestNoBoundMethodReturnsAnInternalType(t *testing.T) {
 
 	// The value types the frontend genuinely needs.
 	allowed := map[string]bool{
-		"bindings.AppInfo":      true,
 		"bindings.SettingsView": true,
 		"jobs.Artifact":         true,
-		"jobs.ExportedArtifact": true,
 		"jobs.Job":              true,
 		"jobs.Request":          true,
 		"console.Entry":         true,

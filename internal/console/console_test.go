@@ -31,6 +31,21 @@ func TestAppendPublishes(t *testing.T) {
 	}
 }
 
+// TestRawCarriesTheDetail verifies that a raw entry keeps its payload
+// verbatim, which is the only level that carries one.
+func TestRawCarriesTheDetail(t *testing.T) {
+	log := New()
+
+	entry := log.Raw("api", "the response arrived", `{"ok":true}`)
+
+	if entry.Level != LevelRaw {
+		t.Errorf("level = %q, want %q", entry.Level, LevelRaw)
+	}
+	if entry.Detail != `{"ok":true}` {
+		t.Errorf("detail = %q, want the payload verbatim", entry.Detail)
+	}
+}
+
 // TestEntriesAreCapped verifies that the log does not grow without
 // bound.
 func TestEntriesAreCapped(t *testing.T) {

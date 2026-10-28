@@ -12,7 +12,6 @@
 import * as AppServiceBindings from '../../bindings/github.com/incurl/valkyrie/internal/bindings/appservice';
 import * as BindingsModels from '../../bindings/github.com/incurl/valkyrie/internal/bindings/models';
 import * as JobsModels from '../../bindings/github.com/incurl/valkyrie/internal/jobs/models';
-import * as PocketBaseModels from '../../bindings/github.com/incurl/valkyrie/internal/pocketbase/models';
 import * as ConsoleModels from '../../bindings/github.com/incurl/valkyrie/internal/console/models';
 
 // The generated model classes are the source of truth for the shapes that
@@ -93,14 +92,14 @@ export function listJobs(limit = 50): Promise<Job[]> {
 }
 
 /**
- * Returns a single job.
- */
-export function getJob(jobId: string): Promise<Job> {
-  return AppServiceBindings.GetJob(jobId) as unknown as Promise<Job>;
-}
-
-/**
  * Lists the stored artifacts.
+ *
+ * An empty jobId lists every artifact.
+ *
+ * No panel calls this yet: the scaffold has no artifact panel. It is
+ * here because the artifacts are part of the queue's contract, and the
+ * add-frontend-panel skill uses it as the example of a list with
+ * per-row actions.
  */
 export function listArtifacts(jobId = '', limit = 50): Promise<Artifact[]> {
   return AppServiceBindings.ListArtifacts(jobId, limit) as unknown as Promise<Artifact[]>;
@@ -108,6 +107,8 @@ export function listArtifacts(jobId = '', limit = 50): Promise<Artifact[]> {
 
 /**
  * Removes a stored artifact.
+ *
+ * No panel calls this yet: see listArtifacts.
  */
 export function deleteArtifact(artifactId: string): Promise<void> {
   return AppServiceBindings.DeleteArtifact(artifactId) as Promise<void>;
@@ -149,52 +150,6 @@ export function saveUI(ui: { zoom: number; theme: string }): Promise<void> {
 }
 
 /**
- * A stored file prepared for download.
- *
- * The format is carried alongside the bytes, so that the downloaded
- * file is named and typed after the format it really is.
- */
-export type ExportedArtifact = {
-  bytes: Uint8Array;
-  extension: string;
-  mime: string;
-  name: string;
-};
-
-/**
- * Returns the bytes of a stored artifact, with the format they really
- * are, so it can be saved to disk.
- */
-export async function exportArtifact(artifactId: string): Promise<ExportedArtifact> {
-  const result = (await AppServiceBindings.ExportArtifact(artifactId)) as unknown as
-    | (JobsModels.ExportedArtifact & { bytes: string | null })
-    | null;
-
-  if (!result) {
-    throw new Error('The artifact could not be exported.');
-  }
-
-  return {
-    bytes: base64ToBytes(result.bytes ?? ''),
-    extension: result.extension,
-    mime: result.mime,
-    name: result.name,
-  };
-}
-
-/**
- * Decodes a base64 string into raw bytes.
- */
-function base64ToBytes(encoded: string): Uint8Array {
-  const binary = atob(encoded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-/**
  * The generated model classes, re-exported for callers that need them.
  */
-export { JobsModels, BindingsModels, PocketBaseModels };
+export { JobsModels, BindingsModels, ConsoleModels };

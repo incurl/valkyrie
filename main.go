@@ -108,8 +108,10 @@ func run() error {
 
 	// --- Wails application -----------------------------------------
 	app := application.New(application.Options{
-		Name:        bindings.AppName,
-		Description: "A Wails v3 + PocketBase + React desktop application",
+		Name: bindings.AppName,
+		// The description lands in the about box of the platform, so
+		// it is the one place the version is visible without a menu.
+		Description: "A Wails v3 + PocketBase + React desktop application, version " + bindings.AppVersion,
 		Services: []application.Service{
 			application.NewService(appService),
 		},

@@ -132,6 +132,10 @@ func (l *Log) Error(source, message string) Entry {
 }
 
 // Raw records a verbatim payload, such as an API response body.
+//
+// It is the only level that carries a detail, and the only one the
+// frontend shows in its detail view: a runner that wants the reader to
+// see the exact bytes the API returned logs them here.
 func (l *Log) Raw(source, message, detail string) Entry {
 	return l.Append(LevelRaw, source, message, detail)
 }

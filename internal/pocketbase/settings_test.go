@@ -97,10 +97,7 @@ func TestAPIKeyIsEncrypted(t *testing.T) {
 	}
 
 	// The stored record must not contain the plain key.
-	record, err := store.findRecord(SettingAPIKey)
-	if err != nil {
-		t.Fatalf("find record: %v", err)
-	}
+	record := store.findRecord(SettingAPIKey)
 	if record == nil {
 		t.Fatal("the setting was not stored")
 	}

@@ -43,7 +43,7 @@ func okRunner() jobs.Runner {
 }
 
 // waitForStatus waits until the job reaches one of the wanted statuses.
-func waitForStatus(t *testing.T, m *jobs.Manager, jobID string, wanted ...string) jobs.Job {
+func waitForStatus(t *testing.T, m *jobs.Manager, jobID string, wanted ...string) {
 	t.Helper()
 
 	deadline := time.Now().Add(5 * time.Second)
@@ -54,7 +54,7 @@ func waitForStatus(t *testing.T, m *jobs.Manager, jobID string, wanted ...string
 		}
 		for _, status := range wanted {
 			if job.Status == status {
-				return job
+				return
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -62,7 +62,6 @@ func waitForStatus(t *testing.T, m *jobs.Manager, jobID string, wanted ...string
 
 	job, _ := m.GetJob(jobID)
 	t.Fatalf("job %q stayed in status %q, wanted one of %v", jobID, job.Status, wanted)
-	return jobs.Job{}
 }
 
 // TestRetryJobKeepsTheOriginalOutputs is the regression test for the

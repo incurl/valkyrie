@@ -286,18 +286,17 @@ These were checked and hold up:
 
 | Package | Coverage | Notes |
 | --- | --- | --- |
-| `internal/console` | 78.4% | Well covered. |
-| `internal/pocketbase` | 68.0% | The schema and the encryption are covered. |
-| `internal/jobs` | 66.0% | The lifecycle is covered; the artifact listing and the manager options are not. |
-| `internal/runner` | 33.3% | The example runner is covered; the echo runner is not. |
-| `internal/bindings` | **0.0%** | No test at all. This is where `RetryJob` lives — the bug in finding 2 was invisible to the suite. |
+| `internal/console` | 83.3% | Well covered. |
+| `internal/pocketbase` | 69.4% | The schema and the encryption are covered. |
+| `internal/jobs` | 67.7% | The lifecycle is covered; the manager options are not. |
+| `internal/runner` | 63.0% | Both runners are covered. |
+| `internal/bindings` | 40.7% | The retry path is covered now, which is what finding 2 needed. |
 | `internal/pocketbase/migrations` | 0.0% | Covered indirectly by the schema test. |
 
-**`internal/bindings` having no tests is the root cause of finding 2.** The `RetryJob` logic is a binding-layer concern, and the
-binding layer is untested. A test on `AppService.RetryJob` would have caught it immediately.
+**`internal/bindings` having no tests was the root cause of finding 2.** The `RetryJob` logic is a binding-layer concern, and
+the binding layer was untested. A test on `AppService.RetryJob` would have caught it immediately, and there is one now.
 
-The untested functions in `internal/jobs` are `ListArtifacts`, `GetArtifact`, `DeleteArtifact`, `SetEmitter`, `SetRunner`,
-`App` and the option constructors.
+The numbers above are a snapshot of the day of the audit. Re-run `go test -cover ./internal/...` for the current ones.
 
 ---
 

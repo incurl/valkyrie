@@ -253,28 +253,3 @@ func TestArtifactStorage(t *testing.T) {
 		t.Errorf("read %d bytes, want %d", len(data), len(png))
 	}
 }
-
-// TestExportArtifactDetectsFormat verifies that the export names the
-// file after the format the bytes really are.
-func TestExportArtifactDetectsFormat(t *testing.T) {
-	m := newTestManager(t)
-
-	// A JPEG header is enough for the format detection.
-	jpeg := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'}
-
-	artifact, err := m.StoreArtifact("", ArtifactKindOutput, jpeg, "lying.png", nil)
-	if err != nil {
-		t.Fatalf("store artifact: %v", err)
-	}
-
-	exported, err := m.ExportArtifact(artifact.ID)
-	if err != nil {
-		t.Fatalf("export: %v", err)
-	}
-	if exported.Extension != "jpg" {
-		t.Errorf("extension = %q, want jpg", exported.Extension)
-	}
-	if exported.Mime != "image/jpeg" {
-		t.Errorf("mime = %q, want image/jpeg", exported.Mime)
-	}
-}

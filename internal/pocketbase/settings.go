@@ -56,29 +56,26 @@ func NewSettingsStore(app core.App, cipher *Cipher) *SettingsStore {
 	return &SettingsStore{app: app, cipher: cipher}
 }
 
-// findRecord looks up the settings record for key. It returns nil when
-// the setting has not been written yet.
-func (s *SettingsStore) findRecord(key string) (*core.Record, error) {
+// findRecord looks up the settings record for key.
+//
+// It returns nil when the setting has not been written yet. A missing
+// record is not an error: the caller decides whether to create it.
+func (s *SettingsStore) findRecord(key string) *core.Record {
 	record, err := s.app.FindFirstRecordByFilter(
 		CollectionAppSettings,
 		"key = {:key}",
 		map[string]any{"key": key},
 	)
 	if err != nil {
-		// A missing record is not an error: the caller decides whether
-		// to create it.
-		return nil, nil
+		return nil
 	}
-	return record, nil
+	return record
 }
 
 // ensureRecord returns the settings record for key, creating it when it
 // does not exist yet.
 func (s *SettingsStore) ensureRecord(key string) (*core.Record, error) {
-	record, err := s.findRecord(key)
-	if err != nil {
-		return nil, err
-	}
+	record := s.findRecord(key)
 	if record != nil {
 		return record, nil
 	}
@@ -135,10 +132,7 @@ func (s *SettingsStore) setValue(key string, value any, encrypted bool) error {
 // value is read as raw JSON so that both JSON documents and JSON
 // strings (the encrypted envelope) round-trip correctly.
 func (s *SettingsStore) getValue(key string, encrypted bool, out any) (bool, error) {
-	record, err := s.findRecord(key)
-	if err != nil {
-		return false, err
-	}
+	record := s.findRecord(key)
 	if record == nil {
 		return false, nil
 	}

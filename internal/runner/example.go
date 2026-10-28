@@ -51,7 +51,7 @@ func (e *Example) Run(ctx context.Context, job jobs.Job) (*jobs.Result, error) {
 		if _, found, err := e.settings.GetAPIKey(); err != nil {
 			return nil, err
 		} else if !found {
-			return nil, fmt.Errorf("no API key is configured. Add one in Settings.")
+			return nil, fmt.Errorf("no API key is configured, add one in Settings")
 		}
 	}
 

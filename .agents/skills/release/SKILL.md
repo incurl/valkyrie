@@ -51,7 +51,8 @@ info:
 ```
 
 It is also embedded in the macOS and Windows metadata (`build/darwin/Info.plist`, `build/windows/info.json`) and in
-`internal/bindings/service.go` (`AppVersion`). All of them must agree.
+`internal/bindings/service.go` (`AppVersion`, which reaches the binary through the about-box description). All of them must
+agree.
 
 Use **semantic versioning**:
 

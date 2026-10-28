@@ -159,11 +159,6 @@ func (s *AppService) ListJobs(limit int) ([]jobs.Job, error) {
 	return s.jobs.ListJobs(limit)
 }
 
-// GetJob returns a single job.
-func (s *AppService) GetJob(jobID string) (jobs.Job, error) {
-	return s.jobs.GetJob(jobID)
-}
-
 // ListArtifacts returns the stored artifacts.
 func (s *AppService) ListArtifacts(jobID string, limit int) ([]jobs.Artifact, error) {
 	return s.jobs.ListArtifacts(jobID, limit)
@@ -172,51 +167,6 @@ func (s *AppService) ListArtifacts(jobID string, limit int) ([]jobs.Artifact, er
 // DeleteArtifact removes a stored artifact.
 func (s *AppService) DeleteArtifact(artifactID string) error {
 	return s.jobs.DeleteArtifact(artifactID)
-}
-
-// UploadArtifact stores an uploaded file.
-//
-// The file is kept in the local database and served by PocketBase's own
-// file route, so it is reachable from the UI's own origin.
-func (s *AppService) UploadArtifact(kind string, data []byte, filename string) (jobs.Artifact, error) {
-	return s.jobs.StoreArtifact("", kind, data, filename, nil)
-}
-
-// ExportArtifact returns the bytes of a stored artifact, so the frontend
-// can save it to disk.
-//
-// The response carries the format of the bytes, so that the downloaded
-// file is named and typed after the format it really is, instead of
-// always being called ".png".
-func (s *AppService) ExportArtifact(artifactID string) (*jobs.ExportedArtifact, error) {
-	return s.jobs.ExportArtifact(artifactID)
-}
-
-// Describe reports what the application is and what it is wired to.
-//
-// The frontend shows it in the settings dialog, so that a developer can
-// see at a glance which backend is registered.
-func (s *AppService) Describe() (AppInfo, error) {
-	info := AppInfo{
-		Name:    AppName,
-		Version: AppVersion,
-	}
-	if _, found, err := s.settings.GetAPIKey(); err != nil {
-		return AppInfo{}, err
-	} else {
-		info.HasAPIKey = found
-	}
-	return info, nil
-}
-
-// AppInfo describes the running application.
-type AppInfo struct {
-	// Name is the application name.
-	Name string `json:"name"`
-	// HasAPIKey reports whether an API key is stored.
-	HasAPIKey bool `json:"has_api_key"`
-	// Version is the application version.
-	Version string `json:"version"`
 }
 
 // AppName is the name of the application.

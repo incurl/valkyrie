@@ -205,7 +205,7 @@ func (m *Manager) Submit(req Request) (Job, error) {
 		return Job{}, err
 	}
 
-	go m.run(record.Id, req)
+	go m.run(record.Id)
 
 	return job, nil
 }
@@ -450,7 +450,7 @@ func (m *Manager) jobContext() (context.Context, context.CancelFunc) {
 //
 // It acquires a slot in the concurrency queue, transitions the job to
 // running, calls the runner and records the outcome.
-func (m *Manager) run(jobID string, req Request) {
+func (m *Manager) run(jobID string) {
 	// Wait for a free slot. The queue bounds the parallelism so that a
 	// burst of submissions cannot flood a rate-limited backend.
 	m.queue <- struct{}{}
