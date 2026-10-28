@@ -5,6 +5,7 @@
 | [`architecture.md`](architecture.md) | Why the pieces are shaped the way they are. Read it before changing the structure. |
 | [`porting.md`](porting.md) | The checklist for taking the template to a new application. |
 | [`troubleshooting.md`](troubleshooting.md) | The failures that cost time, and what actually fixes them. |
+| [`audit.md`](audit.md) | The 2026-10-28 review: the findings, the reproductions, and the suggested order of work. |
 
 The repository-root files carry the rest:
 

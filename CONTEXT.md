@@ -22,6 +22,16 @@ The reference runner in `internal/runner/echo.go`. It waits briefly, honours the
 so the scaffold runs with no external service and so the queue can be exercised end to end.
 _Avoid_: Mock runner, Test runner, Default runner
 
+**Reconcile**:
+The startup pass that resolves the jobs a crash left behind, marking them failed or re-enqueueing them. The scaffold does not
+do this yet: a job left in `running` is never resumed and cannot be deleted.
+_Avoid_: Recover, Replay, Resume
+
+**Retry**:
+The action that runs a finished job again with the same parameters. It creates a **new** job; it must not take the original's
+outputs with it.
+_Avoid_: Repeat, Rerun, Restart
+
 **Job status**:
 The lifecycle state of a job: `pending`, `running`, `completed`, `failed` or `cancelled`. It is a fixed enumeration, not a free
 string.

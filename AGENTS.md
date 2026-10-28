@@ -204,6 +204,17 @@ development and testing.
 
 ## Known Rough Edges
 
+0. **The 2026-10-28 audit found eight issues that are still open.** Read [`docs/audit.md`](docs/audit.md) before extending the
+   queue. The two that matter most:
+   - **`RetryJob` steals the original job's artifacts** (`internal/bindings/service.go`), and deleting the retry then deletes the
+     original's files. Do not extend `RetryJob` without fixing it first.
+   - **Server mode has no authentication.** The `jobs` and `artifacts` collections have public read rules, so anyone who can
+     reach the server port can read every prompt and parameter. The desktop app is in-process and unaffected; the container
+     image binds `0.0.0.0` and is affected.
+   - A crash leaves jobs stuck in `running`: never resumed, never deletable. There is no startup reconciliation.
+   - There is no job timeout and no graceful shutdown, so two hung runners halt the application.
+   - `internal/bindings` has **no tests**, which is why the `RetryJob` bug went unnoticed.
+
 1. **`go build ./...` fails on `build/ios`** with `function main is undeclared in the main package`. This is expected: it is a
    separate `main` package behind the `//go:build ios` tag. Build the root package and `./internal/...` instead.
 2. **npm 9.2.0 cannot resolve the vitest 4 peer tree** and fails with `Cannot read properties of null (reading 'edgesOut')`. Use
