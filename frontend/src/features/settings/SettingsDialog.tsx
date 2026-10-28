@@ -39,17 +39,17 @@ export function SettingsDialog({
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [zoom, setZoom] = useState(100);
-  // The persisted zoom, used to restore the interface when the dialog is
-  // closed without saving.
-  const [savedZoom, setSavedZoom] = useState(100);
+
+  // The persisted zoom. It is read from the settings rather than kept in
+  // a second piece of state, so the two cannot drift apart.
+  const savedZoom = settings?.ui.zoom ?? 100;
 
   useEffect(() => {
     if (!settings) {
       return;
     }
     setBaseUrl(settings.base_url ?? '');
-    setZoom(settings.ui?.zoom ?? 100);
-    setSavedZoom(settings.ui?.zoom ?? 100);
+    setZoom(settings.ui.zoom);
   }, [settings]);
 
   if (!open) {
@@ -148,7 +148,7 @@ export function SettingsDialog({
           <button
             type="button"
             className="btn"
-            onClick={() => onSaveUI({ zoom, theme: settings?.ui?.theme ?? 'dark' })}
+            onClick={() => onSaveUI({ zoom, theme: settings?.ui.theme ?? 'dark' })}
           >
             Apply zoom
           </button>

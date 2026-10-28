@@ -434,6 +434,57 @@ code {
   color: var(--success);
 }
 
+/* ---------- Crash screen ---------- */
+
+/*
+ * Shown by the error boundary instead of a blank window, which a desktop
+ * application cannot recover from.
+ */
+.crash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  background: var(--bg);
+}
+
+.crash-panel {
+  max-width: 40rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--bg-raised);
+  border: 0.0769rem solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.crash-panel h1 {
+  margin: 0;
+  font-size: 1.2308rem;
+  font-weight: 600;
+}
+
+.crash-message {
+  margin: 0;
+  padding: 0.7692rem;
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 0.8462rem;
+  color: var(--danger);
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* The message is the useful part, so it must be selectable. */
+  user-select: text;
+}
+
+.crash-actions {
+  display: flex;
+  gap: 0.5385rem;
+}
+
 /* ---------- Console ---------- */
 
 .console {

@@ -50,7 +50,7 @@ func main() {
 		)),
 	)
 
-	job, err := manager.Submit(context.Background(), jobs.Request{
+	job, err := manager.Submit(jobs.Request{
 		Title:  "a red bicycle",
 		Prompt: "a red bicycle",
 		Params: map[string]any{"style": "photo"},

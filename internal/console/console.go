@@ -66,32 +66,12 @@ type Log struct {
 	entries []Entry
 	nextID  int64
 
-	// emitterFn lazily resolves the emitter, because the Wails
-	// application is created after the log.
-	emitterFn func() Emitter
-	emitter   Emitter
+	emitter Emitter
 }
 
 // New creates an empty log.
 func New() *Log {
 	return &Log{nextID: 1}
-}
-
-// WithEmitter sets the emitter used to publish entries.
-func WithEmitter(e Emitter) *Log {
-	l := New()
-	l.emitter = e
-	return l
-}
-
-// WithEmitterFunc sets a lazily resolved emitter.
-//
-// The emitter needs the Wails application, which is created after the
-// log, so it is resolved on first use instead.
-func WithEmitterFunc(fn func() Emitter) *Log {
-	l := New()
-	l.emitterFn = fn
-	return l
 }
 
 // SetEmitter attaches the emitter once it becomes available.
@@ -102,16 +82,6 @@ func (l *Log) SetEmitter(e Emitter) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.emitter = e
-}
-
-// emitterLocked returns the emitter, resolving the lazy one if needed.
-//
-// The caller must hold the lock.
-func (l *Log) emitterLocked() Emitter {
-	if l.emitter == nil && l.emitterFn != nil {
-		l.emitter = l.emitterFn()
-	}
-	return l.emitter
 }
 
 // Append records an entry and publishes it.
@@ -137,7 +107,7 @@ func (l *Log) Append(level Level, source, message, detail string) Entry {
 	if len(l.entries) > maxEntries {
 		l.entries = l.entries[len(l.entries)-maxEntries:]
 	}
-	emitter := l.emitterLocked()
+	emitter := l.emitter
 	l.mu.Unlock()
 
 	if emitter != nil {

@@ -6,10 +6,6 @@ import (
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
-	"image/png"
-	"io"
-	"path/filepath"
-	"strings"
 )
 
 // MediaType describes a detected media format.
@@ -50,31 +46,6 @@ func MimeTypeOf(data []byte) string {
 	return DetectMediaType(data).Mime
 }
 
-// MimeTypeOfName returns the MIME type implied by a file name.
-//
-// It is only a fallback: when the bytes are available, they are
-// authoritative.
-func MimeTypeOfName(name string) string {
-	switch strings.ToLower(filepath.Ext(name)) {
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".png":
-		return "image/png"
-	case ".gif":
-		return "image/gif"
-	case ".webp":
-		return "image/webp"
-	case ".pdf":
-		return "application/pdf"
-	case ".json":
-		return "application/json"
-	case ".txt":
-		return "text/plain"
-	default:
-		return "application/octet-stream"
-	}
-}
-
 // ImageSize describes the pixel dimensions of an image.
 type ImageSize struct {
 	Width  int `json:"width"`
@@ -91,12 +62,4 @@ func DimensionsOf(data []byte) (ImageSize, error) {
 		return ImageSize{}, fmt.Errorf("decode image: %w", err)
 	}
 	return ImageSize{Width: cfg.Width, Height: cfg.Height}, nil
-}
-
-// EncodePNG writes the image to w in PNG format.
-func EncodePNG(w io.Writer, img image.Image) error {
-	if err := png.Encode(w, img); err != nil {
-		return fmt.Errorf("encode png: %w", err)
-	}
-	return nil
 }

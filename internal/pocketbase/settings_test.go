@@ -37,7 +37,11 @@ func TestSchemaIsCreated(t *testing.T) {
 		_ = service.Close()
 	})
 
-	for _, name := range []string{CollectionJobs, CollectionArtifacts, CollectionAppSettings} {
+	// The names are spelled out here on purpose: this test asserts what
+	// the migration created, so it must not follow a constant that could
+	// be renamed on the other side. The jobs package names the same
+	// collections for the code that uses them.
+	for _, name := range []string{"jobs", "artifacts", CollectionAppSettings} {
 		if _, err := service.Collection(name); err != nil {
 			t.Errorf("collection %q: %v", name, err)
 		}

@@ -3,8 +3,8 @@
 A full review of the scaffold, carried out against the running code rather than by inspection. Every finding below was
 reproduced with a test or a live request; the reproductions are described so they can be re-run.
 
-**Scope**: `internal/` (4,168 lines of Go), `frontend/src` (1,297 lines of TS/TSX), the build tooling, the CI and the
-documentation.
+**Scope**: every Go package under `internal/`, the root `main.go`, the React frontend under `frontend/src`, the build
+tooling, the CI and the documentation.
 
 **Verdict**: the scaffold is sound for a single-user desktop application. The **critical** issue is confined to server mode,
 which is currently an opt-in build. The **high** issue is a data-loss bug in `RetryJob` that affects every deployment. The

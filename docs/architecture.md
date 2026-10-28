@@ -119,6 +119,21 @@ frontend expects, and it is why the frontend never needs write access to the API
 
 `app_settings` gets no rule at all, which is what keeps it out of reach of the HTTP API.
 
+## The queue knows about images, on purpose
+
+`internal/jobs/media.go` decodes image headers, and the `artifacts` collection carries `width` and `height` columns. That is
+image-specific knowledge inside a package whose headline claim is that the queue is generic.
+
+It is a deliberate trade-off, and this is the honest statement of it: **images are the common case, and detecting the format
+from the bytes is the thing that is easy to get wrong.** Storing a JPEG under a `.png` name produces a file that every tool
+misidentifies. The scaffold does that detection once, correctly, rather than leaving it to each application.
+
+The cost is that a queue storing audio, PDFs or JSON still runs `DimensionsOf`, still fails the decode, and still carries two
+columns it never fills. The decode failure is ignored, so nothing breaks; the columns stay zero.
+
+If an application is not image-based, the clean fix is to move the dimensions into the `artifacts.meta` JSON field, which
+needs a migration. Until then, this is the trade-off, and it is not a bug.
+
 ## The listing is batched
 
 `ListJobs` converts a whole page at once. It fetches the artifacts of the page with a single query, rather than letting each

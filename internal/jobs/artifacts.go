@@ -92,6 +92,11 @@ func (m *Manager) DeleteArtifact(artifactID string) error {
 }
 
 // ArtifactBytes reads the bytes of a stored artifact.
+//
+// It exists for the Runner: a runner that the queue handed an
+// InputArtifactIDs list needs to turn an id into the file. Nothing else
+// should reach for it -- the frontend reads a file by its URL, which
+// PocketBase serves.
 func (m *Manager) ArtifactBytes(artifactID string) ([]byte, error) {
 	record, err := m.app.FindRecordById(CollectionArtifacts, artifactID)
 	if err != nil {

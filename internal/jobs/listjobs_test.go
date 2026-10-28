@@ -22,7 +22,7 @@ func TestListJobsFetchesTheArtifactsInOneQuery(t *testing.T) {
 	// Three jobs, each with an output and an input.
 	var jobIDs []string
 	for i := 0; i < 3; i++ {
-		job, err := m.Submit(context.Background(), Request{Prompt: "a job"})
+		job, err := m.Submit(Request{Prompt: "a job"})
 		if err != nil {
 			t.Fatalf("submit: %v", err)
 		}
@@ -76,7 +76,7 @@ func TestListJobsWithNoArtifacts(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "a job"})
+	job, err := m.Submit(Request{Prompt: "a job"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}

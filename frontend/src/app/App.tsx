@@ -9,7 +9,7 @@
  * talks to PocketBase or to a remote API directly.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Events } from '@wailsio/runtime';
 
@@ -37,9 +37,29 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
 
+  // The toast timer is kept so that a second toast replaces the first
+  // instead of being dismissed by the first one's timer.
+  const toastTimer = useRef<number | null>(null);
+
   const notify = useCallback((message: string, kind: Toast['kind'] = 'info') => {
     setToast({ message, kind });
-    window.setTimeout(() => setToast(null), 4000);
+
+    if (toastTimer.current !== null) {
+      window.clearTimeout(toastTimer.current);
+    }
+    toastTimer.current = window.setTimeout(() => {
+      toastTimer.current = null;
+      setToast(null);
+    }, 4000);
+  }, []);
+
+  // A pending timer must not outlive the component.
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current !== null) {
+        window.clearTimeout(toastTimer.current);
+      }
+    };
   }, []);
 
   // --- Data ---------------------------------------------------------
@@ -167,7 +187,7 @@ function App() {
   // The zoom is restored as soon as the settings are known.
   useEffect(() => {
     if (settingsQuery.data) {
-      applyZoom(settingsQuery.data.ui?.zoom ?? 100);
+      applyZoom(settingsQuery.data.ui.zoom);
     }
   }, [settingsQuery.data]);
 

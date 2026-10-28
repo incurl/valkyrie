@@ -2,9 +2,13 @@ package jobs
 
 // Collection names used by the job queue.
 //
-// They mirror the constants in the pocketbase package, which owns the
-// schema. They are repeated here so that the jobs package does not
-// have to import the persistence package, which would create a cycle.
+// This package owns the queue's vocabulary, because it is the only
+// consumer of it. The schema that creates these collections is the
+// migration in internal/pocketbase/migrations, which names them
+// literally.
+//
+// Keep the two in step: a rename here without a migration renames
+// nothing in the database.
 const (
 	// CollectionJobs stores the job metadata.
 	CollectionJobs = "jobs"

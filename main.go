@@ -78,7 +78,6 @@ func run() error {
 	// scaffold ships an echo runner, which is replaced by your own.
 	jobManager := jobs.NewManager(
 		pbService.App(),
-		jobs.WithEmitter(bridge),
 		jobs.WithLog(consoleLog),
 		jobs.WithRunnerFunc(func() jobs.Runner {
 			return runner.NewEcho(settings, consoleLog)

@@ -66,28 +66,6 @@ func TestDetectMediaType(t *testing.T) {
 	}
 }
 
-// TestMimeTypeOfName verifies the name based fallback.
-func TestMimeTypeOfName(t *testing.T) {
-	cases := map[string]string{
-		"a.png":       "image/png",
-		"a.jpg":       "image/jpeg",
-		"a.jpeg":      "image/jpeg",
-		"a.gif":       "image/gif",
-		"a.webp":      "image/webp",
-		"a.pdf":       "application/pdf",
-		"a.json":      "application/json",
-		"a.txt":       "text/plain",
-		"a.unknown":   "application/octet-stream",
-		"noextension": "application/octet-stream",
-	}
-
-	for name, want := range cases {
-		if got := MimeTypeOfName(name); got != want {
-			t.Errorf("MimeTypeOfName(%q) = %q, want %q", name, got, want)
-		}
-	}
-}
-
 // TestDefaultTitle verifies that a title is derived from the prompt
 // when the application does not supply one.
 func TestDefaultTitle(t *testing.T) {

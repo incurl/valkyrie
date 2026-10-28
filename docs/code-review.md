@@ -9,6 +9,18 @@ Every claim below was checked against the code. Where a claim was testable, it w
 
 ---
 
+## Status
+
+Findings 1–11 and 13–17 were resolved on 2026-10-28, in the order given at the end of this document. Finding 12 (the
+`App.tsx` split) was deliberately deferred: it is the one change here that is easier to do correctly once a second real panel
+exists. Finding 15 was resolved by documenting the trade-off rather than by changing the schema.
+
+One finding changed shape on implementation. `ArtifactBytes` was listed as dead code because only a test called it, but it is
+the method a **runner** calls to turn an input artifact id into bytes, and the runner cannot reach the database any other way.
+It is kept, and now says so in its doc comment.
+
+---
+
 ## Verdict
 
 This is a good codebase with a handful of specific weaknesses. The structure is right: the domain is behind a one-method

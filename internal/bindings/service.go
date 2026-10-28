@@ -7,8 +7,6 @@
 package bindings
 
 import (
-	"context"
-
 	"github.com/incurl/valkyrie/internal/console"
 	"github.com/incurl/valkyrie/internal/jobs"
 	"github.com/incurl/valkyrie/internal/pocketbase"
@@ -33,15 +31,13 @@ func NewAppService(
 	return &AppService{pb: pb, settings: settings, jobs: jobManager, console: log}
 }
 
-// JobManager exposes the job manager so the Wails event bridge can
-// subscribe to job updates.
-func (s *AppService) JobManager() *jobs.Manager { return s.jobs }
-
-// Console exposes the debug console log.
-func (s *AppService) Console() *console.Log { return s.console }
-
-// Settings exposes the settings store.
-func (s *AppService) Settings() *pocketbase.SettingsStore { return s.settings }
+// The service deliberately exposes no accessors for the objects it
+// owns. Every exported method on a bound service becomes a method in the
+// generated TypeScript, so a JobManager() or a Settings() accessor
+// advertises an API the frontend cannot use: those types hold unexported
+// fields and serialise to an empty object. They were also unused.
+//
+// If a method is needed, bind it explicitly here.
 
 // ListConsoleEntries returns the recorded debug console entries,
 // oldest first.
@@ -123,7 +119,7 @@ func (s *AppService) SaveUI(ui pocketbase.UI) error {
 
 // SubmitJob queues a job.
 func (s *AppService) SubmitJob(request jobs.Request) (jobs.Job, error) {
-	return s.jobs.Submit(context.Background(), request)
+	return s.jobs.Submit(request)
 }
 
 // CancelJob cancels a pending or running job.
@@ -155,7 +151,7 @@ func (s *AppService) RetryJob(jobID string) (jobs.Job, error) {
 		Params:           job.Params,
 		InputArtifactIDs: job.InputArtifactIDs,
 	}
-	return s.jobs.Submit(context.Background(), request)
+	return s.jobs.Submit(request)
 }
 
 // ListJobs returns the recorded jobs.
@@ -202,8 +198,8 @@ func (s *AppService) ExportArtifact(artifactID string) (*jobs.ExportedArtifact, 
 // see at a glance which backend is registered.
 func (s *AppService) Describe() (AppInfo, error) {
 	info := AppInfo{
-		Name:      AppName,
-		HasAPIKey: false,
+		Name:    AppName,
+		Version: AppVersion,
 	}
 	if _, found, err := s.settings.GetAPIKey(); err != nil {
 		return AppInfo{}, err

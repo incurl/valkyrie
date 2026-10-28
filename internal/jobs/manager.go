@@ -31,9 +31,6 @@ type Manager struct {
 	emitter EventEmitter
 	runner  Runner
 
-	// emitterFn lazily resolves the emitter, if one was configured.
-	emitterFn func() EventEmitter
-
 	// runnerFn lazily resolves the runner, if one was configured.
 	runnerFn func() Runner
 
@@ -72,18 +69,6 @@ const DefaultTimeout = 30 * time.Minute
 
 // ManagerOption configures a Manager.
 type ManagerOption func(*Manager)
-
-// WithEmitter sets the job update emitter.
-func WithEmitter(e EventEmitter) ManagerOption {
-	return func(m *Manager) { m.emitter = e }
-}
-
-// WithEmitterFunc sets a lazily resolved job update emitter. It is used
-// because the emitter needs the Wails application, which is created
-// after the job manager.
-func WithEmitterFunc(fn func() EventEmitter) ManagerOption {
-	return func(m *Manager) { m.emitterFn = fn }
-}
 
 // WithRunner sets the runner that executes the jobs.
 func WithRunner(r Runner) ManagerOption {
@@ -142,34 +127,22 @@ func NewManager(app core.App, opts ...ManagerOption) *Manager {
 	return m
 }
 
-// App returns the underlying PocketBase app.
-func (m *Manager) App() core.App { return m.app }
-
-// SetEmitter attaches the job update emitter once it becomes available.
+// SetEmitter attaches the job update emitter.
+//
+// The emitter needs the Wails application, which is created after the
+// manager, so it is attached once the application exists rather than
+// passed to the constructor.
 func (m *Manager) SetEmitter(e EventEmitter) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.emitter = e
 }
 
-// SetRunner attaches the runner once it becomes available.
-func (m *Manager) SetRunner(r Runner) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.runner = r
-}
-
-// currentEmitter resolves the active emitter.
+// currentEmitter returns the active emitter, or nil.
 func (m *Manager) currentEmitter() EventEmitter {
 	m.mu.Lock()
-	emitter := m.emitter
-	fn := m.emitterFn
-	m.mu.Unlock()
-
-	if emitter == nil && fn != nil {
-		emitter = fn()
-	}
-	return emitter
+	defer m.mu.Unlock()
+	return m.emitter
 }
 
 // currentRunner resolves the active runner.
@@ -189,7 +162,11 @@ func (m *Manager) currentRunner() Runner {
 //
 // The job is persisted with status "pending" before it is queued, so the
 // UI can display it immediately.
-func (m *Manager) Submit(ctx context.Context, req Request) (Job, error) {
+//
+// It takes no context, because it does not wait for anything: the job
+// runs on its own goroutine under the manager's context. Cancelling a
+// submitted job is Cancel's job.
+func (m *Manager) Submit(req Request) (Job, error) {
 	if req.Prompt == "" {
 		return Job{}, fmt.Errorf("a prompt is required")
 	}
@@ -456,6 +433,19 @@ func (m *Manager) GetJob(jobID string) (Job, error) {
 	return m.toJob(record)
 }
 
+// jobContext builds the context a single job runs under.
+//
+// Exactly one context is created, so that its cancel function is the
+// one the caller holds. Building a cancellable context and then
+// replacing it with a timeout would drop the first cancel function and
+// leak the first context for the life of the manager.
+func (m *Manager) jobContext() (context.Context, context.CancelFunc) {
+	if m.timeout > 0 {
+		return context.WithTimeout(m.rootCtx, m.timeout)
+	}
+	return context.WithCancel(m.rootCtx)
+}
+
 // run executes a job.
 //
 // It acquires a slot in the concurrency queue, transitions the job to
@@ -486,10 +476,7 @@ func (m *Manager) run(jobID string, req Request) {
 	// The job context derives from the manager's root context, so that
 	// a shutdown stops it, and it carries the timeout, so that a runner
 	// that never returns cannot hold its slot forever.
-	ctx, cancel := context.WithCancel(m.rootCtx)
-	if m.timeout > 0 {
-		ctx, cancel = context.WithTimeout(m.rootCtx, m.timeout)
-	}
+	ctx, cancel := m.jobContext()
 
 	m.mu.Lock()
 	m.cancels[jobID] = cancel
@@ -601,28 +588,17 @@ func (m *Manager) failJob(jobID string, code int, message string) {
 //
 // A Runner may return a *Error to attach a numeric code; anything else
 // is reported with its own text and no code.
+//
+// errors.As is used rather than a hand-rolled unwrap loop, because it
+// also walks errors.Join's Unwrap() []error. A runner that reports the
+// API failure and a cleanup failure together would otherwise lose the
+// code.
 func describeError(err error) (int, string) {
 	var coded *Error
-	if asError(err, &coded) {
+	if errors.As(err, &coded) {
 		return coded.Code, coded.Error()
 	}
 	return 0, err.Error()
-}
-
-// asError unwraps a *Error from an error chain.
-func asError(err error, target **Error) bool {
-	for err != nil {
-		if coded, ok := err.(*Error); ok {
-			*target = coded
-			return true
-		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = unwrapper.Unwrap()
-	}
-	return false
 }
 
 // logInfo records a normal event for the debug console.
@@ -660,10 +636,7 @@ func (m *Manager) emitRecord(record *core.Record) {
 // toJobs when several jobs are converted at once: it fetches the
 // artifacts of the whole page in a single query.
 func (m *Manager) toJob(record *core.Record) (Job, error) {
-	job, err := recordToJob(record)
-	if err != nil {
-		return Job{}, err
-	}
+	job := recordToJob(record)
 
 	artifacts, err := m.artifactsOfJobs([]string{record.Id})
 	if err != nil {
@@ -697,10 +670,7 @@ func (m *Manager) toJobs(records []*core.Record) ([]Job, error) {
 
 	jobs := make([]Job, 0, len(records))
 	for _, record := range records {
-		job, err := recordToJob(record)
-		if err != nil {
-			return nil, err
-		}
+		job := recordToJob(record)
 		if artifactsErr == nil {
 			job.ArtifactIDs, job.InputArtifactIDs = splitArtifacts(artifacts[record.Id])
 		}
@@ -765,7 +735,7 @@ func splitArtifacts(records []*core.Record) (outputs []string, inputs []string) 
 
 // recordToJob converts a PocketBase record into the frontend-facing
 // job, without collecting its artifacts.
-func recordToJob(record *core.Record) (Job, error) {
+func recordToJob(record *core.Record) Job {
 	job := Job{
 		ID:               record.Id,
 		Title:            record.GetString("title"),
@@ -802,7 +772,7 @@ func recordToJob(record *core.Record) (Job, error) {
 		job.ErrorCode = code
 	}
 
-	return job, nil
+	return job
 }
 
 // StoreArtifact saves a file produced by a job.

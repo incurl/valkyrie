@@ -54,7 +54,7 @@ func waitForStatus(t *testing.T, m *Manager, jobID string, wanted ...string) Job
 func TestSubmitRequiresPrompt(t *testing.T) {
 	m := newTestManager(t)
 
-	if _, err := m.Submit(context.Background(), Request{}); err == nil {
+	if _, err := m.Submit(Request{}); err == nil {
 		t.Fatal("submitting a job without a prompt should fail")
 	}
 }
@@ -68,7 +68,7 @@ func TestJobLifecycle(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "hello there"})
+	job, err := m.Submit(Request{Prompt: "hello there"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestJobFailure(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "do something"})
+	job, err := m.Submit(Request{Prompt: "do something"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestJobCancellation(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "a long job"})
+	job, err := m.Submit(Request{Prompt: "a long job"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestCancelFailedJob(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "fail"})
+	job, err := m.Submit(Request{Prompt: "fail"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestDeleteRunningJobIsRefused(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "still running"})
+	job, err := m.Submit(Request{Prompt: "still running"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestDeleteJobRemovesIt(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "temporary"})
+	job, err := m.Submit(Request{Prompt: "temporary"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}

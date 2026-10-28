@@ -133,7 +133,6 @@ Register it in `main.go`, replacing the echo runner:
 ```go
 jobManager := jobs.NewManager(
     pbService.App(),
-    jobs.WithEmitter(bridge),
     jobs.WithLog(consoleLog),
     jobs.WithTimeout(5 * time.Minute),   // if the default 30 minutes is too long
     jobs.WithRunnerFunc(func() jobs.Runner {
@@ -145,6 +144,8 @@ jobManager := jobs.NewManager(
 **Honour `ctx`.** It is the only way a cancelled job stops. A runner that ignores it keeps a slot in the bounded queue, and
 every later job waits behind it. The context also carries the job's time limit, so a runner that blocks forever is stopped
 even if the user does nothing.
+
+The emitter is attached separately with `jobManager.SetEmitter(bridge)` once the Wails application exists.
 
 **The manager already handles the rest.** A job interrupted by a crash is reconciled at startup, and the Wails `OnShutdown`
 hook stops the running jobs when the window closes. Neither needs anything from the runner.
@@ -198,7 +199,7 @@ The frontend only ever learns whether a key is present (`has_api_key`). Never re
 and assert what your application actually produces:
 
 ```go
-job, err := manager.Submit(context.Background(), jobs.Request{
+job, err := manager.Submit(jobs.Request{
     Title:  "a test job",
     Prompt: "a red bicycle",
     Params: map[string]any{"model": "default"},

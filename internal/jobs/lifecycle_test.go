@@ -21,7 +21,7 @@ func TestJobTimeoutStopsAHungRunner(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "a hung job"})
+	job, err := m.Submit(Request{Prompt: "a hung job"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -45,14 +45,14 @@ func TestJobTimeoutFreesTheQueue(t *testing.T) {
 		},
 	)))
 
-	first, err := m.Submit(context.Background(), Request{Prompt: "the first"})
+	first, err := m.Submit(Request{Prompt: "the first"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
 	waitForStatus(t, m, first.ID, StatusFailed, StatusCompleted, StatusCancelled)
 
 	// The queue must be free again, so the second job runs.
-	second, err := m.Submit(context.Background(), Request{Prompt: "the second"})
+	second, err := m.Submit(Request{Prompt: "the second"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestShutdownCancelsTheRunningJobs(t *testing.T) {
 		},
 	)))
 
-	job, err := m.Submit(context.Background(), Request{Prompt: "a long job"})
+	job, err := m.Submit(Request{Prompt: "a long job"})
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}

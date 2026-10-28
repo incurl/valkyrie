@@ -108,7 +108,7 @@ func newJobRecord(t *testing.T, m *Manager, status string) string {
 		t.Fatalf("find collection: %v", err)
 	}
 
-	record := newRecord(col)
+	record := core.NewRecord(col)
 	record.Set("title", "an interrupted job")
 	record.Set("prompt", "a prompt")
 	record.Set("status", status)
@@ -118,9 +118,4 @@ func newJobRecord(t *testing.T, m *Manager, status string) string {
 		t.Fatalf("save record: %v", err)
 	}
 	return record.Id
-}
-
-// newRecord creates an empty record for a collection.
-func newRecord(col *core.Collection) *core.Record {
-	return core.NewRecord(col)
 }

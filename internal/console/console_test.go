@@ -15,7 +15,8 @@ func (c *collector) EmitConsoleEntry(entry Entry) {
 // emitter.
 func TestAppendPublishes(t *testing.T) {
 	sink := &collector{}
-	log := WithEmitter(sink)
+	log := New()
+	log.SetEmitter(sink)
 
 	log.Info("api", "a request was sent")
 
@@ -106,18 +107,5 @@ func TestFingerprintDoesNotRevealTheSecret(t *testing.T) {
 
 	if Fingerprint("") != "none" {
 		t.Errorf("an empty secret gave %q", Fingerprint(""))
-	}
-}
-
-// TestLazyEmitterIsResolved verifies that an emitter registered after
-// the log was created still receives the entries.
-func TestLazyEmitterIsResolved(t *testing.T) {
-	sink := &collector{}
-	log := WithEmitterFunc(func() Emitter { return sink })
-
-	log.Info("test", "an entry")
-
-	if len(sink.entries) != 1 {
-		t.Errorf("published %d entries, want 1", len(sink.entries))
 	}
 }

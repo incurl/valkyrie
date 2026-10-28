@@ -136,13 +136,15 @@ Then register it in `main.go`, replacing the echo runner:
 ```go
 jobManager := jobs.NewManager(
     pbService.App(),
-    jobs.WithEmitter(bridge),
     jobs.WithLog(consoleLog),
     jobs.WithRunnerFunc(func() jobs.Runner {
         return runner.NewMyRunner(settings, consoleLog)
     }),
 )
 ```
+
+The event emitter is attached with `jobManager.SetEmitter(bridge)` once the Wails application exists, because it needs the
+application. There is no option for it: one way to attach it is one fewer thing to get wrong.
 
 **Keep the runner in `internal/runner/`.** Do not put domain logic in `internal/jobs/`: that package is the generic queue, and
 anything domain-specific in it has to be removed again by the next application that uses the template.
