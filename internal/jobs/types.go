@@ -49,6 +49,12 @@ type Job struct {
 	ErrorMessage string `json:"error_message"`
 	// ArtifactIDs lists the artifact record ids the job produced.
 	ArtifactIDs []string `json:"artifact_ids"`
+	// InputArtifactIDs lists the artifact record ids the job consumed.
+	//
+	// They are tracked separately from the outputs, because a retry
+	// re-uses the inputs while the outputs stay with the job that
+	// produced them.
+	InputArtifactIDs []string `json:"input_artifact_ids"`
 	// Created and Updated are ISO-8601 timestamps.
 	Created string `json:"created"`
 	Updated string `json:"updated"`

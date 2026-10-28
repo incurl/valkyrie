@@ -3,8 +3,10 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/incurl/valkyrie/internal/console"
 	"github.com/pocketbase/dbx"
@@ -45,7 +47,28 @@ type Manager struct {
 
 	// queue bounds how many jobs run at once.
 	queue chan struct{}
+
+	// rootCtx is the context of the whole manager. It is cancelled by
+	// Shutdown, which stops the running jobs.
+	rootCtx context.Context
+	// rootCancel cancels rootCtx.
+	rootCancel context.CancelFunc
+	// wg tracks the running jobs, so that Shutdown can wait for them.
+	wg sync.WaitGroup
+
+	// timeout bounds how long a single job may run. Zero means no
+	// bound.
+	timeout time.Duration
 }
+
+// DefaultTimeout is how long a single job may run.
+//
+// It is a safety net: a runner that never returns would otherwise hold
+// its slot forever and the application would stop making progress.
+//
+// An application whose work legitimately takes longer raises it with
+// WithTimeout, or sets it to zero to remove the bound.
+const DefaultTimeout = 30 * time.Minute
 
 // ManagerOption configures a Manager.
 type ManagerOption func(*Manager)
@@ -90,6 +113,17 @@ func WithConcurrency(n int) ManagerOption {
 	}
 }
 
+// WithTimeout sets how long a single job may run.
+//
+// A job that exceeds the timeout is cancelled and marked as failed.
+// Without it, a runner that never returns holds its slot forever and
+// the application stops making progress.
+//
+// Zero means no bound.
+func WithTimeout(d time.Duration) ManagerOption {
+	return func(m *Manager) { m.timeout = d }
+}
+
 // NewManager creates a job manager.
 func NewManager(app core.App, opts ...ManagerOption) *Manager {
 	m := &Manager{
@@ -97,6 +131,9 @@ func NewManager(app core.App, opts ...ManagerOption) *Manager {
 		cancels: make(map[string]context.CancelFunc),
 		queue:   make(chan struct{}, 2),
 	}
+	m.rootCtx, m.rootCancel = context.WithCancel(context.Background())
+	m.timeout = DefaultTimeout
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(m)
@@ -224,6 +261,16 @@ func defaultTitle(prompt string) string {
 }
 
 // linkArtifacts binds the input artifacts to the job.
+//
+// An artifact that already belongs to another job is **copied** rather
+// than moved: the original job keeps it.
+//
+// Moving it would be a data-loss bug. A retry re-uses the inputs of the
+// job it repeats, and moving them would strip the original job of its
+// outputs and hand them to the retry. Deleting the retry would then
+// delete files the original still refers to.
+//
+// An artifact that belongs to no job is simply claimed.
 func (m *Manager) linkArtifacts(jobID string, artifactIDs []string) error {
 	for _, artifactID := range artifactIDs {
 		if artifactID == "" {
@@ -233,12 +280,81 @@ func (m *Manager) linkArtifacts(jobID string, artifactIDs []string) error {
 		if err != nil {
 			return fmt.Errorf("find artifact %q: %w", artifactID, err)
 		}
-		record.Set("job", jobID)
-		if err := m.app.Save(record); err != nil {
-			return fmt.Errorf("link artifact %q: %w", artifactID, err)
+
+		owner := record.GetString("job")
+		if owner == jobID {
+			continue
 		}
+
+		if owner == "" {
+			// The artifact is unowned: claim it.
+			record.Set("job", jobID)
+			if err := m.app.Save(record); err != nil {
+				return fmt.Errorf("link artifact %q: %w", artifactID, err)
+			}
+			continue
+		}
+
+		// The artifact belongs to another job: copy it, so that both
+		// jobs can refer to the same bytes.
+		copied, err := m.copyArtifact(record, jobID)
+		if err != nil {
+			return fmt.Errorf("copy artifact %q: %w", artifactID, err)
+		}
+		_ = copied
 	}
 	return nil
+}
+
+// copyArtifact creates a new artifact record that holds the same bytes
+// as the given one and belongs to jobID.
+//
+// The file itself is not duplicated on disk: PocketBase stores the file
+// under a name derived from the record, so the copy points at its own
+// stored file. The bytes are read once and written again, which is
+// cheap compared with the alternative of sharing a file across records.
+func (m *Manager) copyArtifact(record *core.Record, jobID string) (*core.Record, error) {
+	data, err := readFileBytes(m.app, record)
+	if err != nil {
+		return nil, err
+	}
+
+	col, err := m.app.FindCollectionByNameOrId(CollectionArtifacts)
+	if err != nil {
+		return nil, fmt.Errorf("find artifacts collection: %w", err)
+	}
+
+	filename := record.GetString("name")
+	if filename == "" {
+		filename = record.GetString("file")
+	}
+
+	file, err := filesystem.NewFileFromBytes(data, filename)
+	if err != nil {
+		return nil, fmt.Errorf("create file: %w", err)
+	}
+
+	copied := core.NewRecord(col)
+	copied.Set("job", jobID)
+	copied.Set("kind", record.GetString("kind"))
+	copied.Set("file", file)
+	copied.Set("name", filename)
+	copied.Set("mime", record.GetString("mime"))
+	copied.Set("bytes", record.GetInt("bytes"))
+	if width := record.GetInt("width"); width != 0 {
+		copied.Set("width", width)
+	}
+	if height := record.GetInt("height"); height != 0 {
+		copied.Set("height", height)
+	}
+	if meta := record.Get("meta"); meta != nil {
+		copied.Set("meta", meta)
+	}
+
+	if err := m.app.Save(copied); err != nil {
+		return nil, fmt.Errorf("save artifact copy: %w", err)
+	}
+	return copied, nil
 }
 
 // Cancel aborts a pending or running job.
@@ -375,16 +491,26 @@ func (m *Manager) run(jobID string, req Request) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// The job context derives from the manager's root context, so that
+	// a shutdown stops it, and it carries the timeout, so that a runner
+	// that never returns cannot hold its slot forever.
+	ctx, cancel := context.WithCancel(m.rootCtx)
+	if m.timeout > 0 {
+		ctx, cancel = context.WithTimeout(m.rootCtx, m.timeout)
+	}
+
 	m.mu.Lock()
 	m.cancels[jobID] = cancel
 	m.mu.Unlock()
 
+	// The job is tracked, so that Shutdown can wait for it.
+	m.wg.Add(1)
 	defer func() {
 		cancel()
 		m.mu.Lock()
 		delete(m.cancels, jobID)
 		m.mu.Unlock()
+		m.wg.Done()
 	}()
 
 	record.Set("status", StatusRunning)
@@ -404,12 +530,28 @@ func (m *Manager) run(jobID string, req Request) {
 
 	result, runErr := runner.Run(ctx, job)
 	if runErr != nil {
-		// A cancelled job keeps its cancelled status: the user asked
-		// for it, it is not a failure.
-		if ctx.Err() != nil {
+		// A job that was cancelled by the user keeps its cancelled
+		// status: the user asked for it, it is not a failure.
+		if errors.Is(ctx.Err(), context.Canceled) && m.rootCtx.Err() == nil {
 			m.logInfo(jobID, "the job was cancelled")
 			return
 		}
+
+		// A job that ran out of time is a failure: the runner did not
+		// finish in the time it was given.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			m.failJob(jobID, 0, fmt.Sprintf(
+				"The job exceeded the time limit of %s and was stopped.", m.timeout))
+			return
+		}
+
+		// A job that was interrupted by the shutdown is marked as
+		// failed, because it will never be resumed.
+		if m.rootCtx.Err() != nil {
+			m.failJob(jobID, 0, "The application was closed while the job was running.")
+			return
+		}
+
 		code, message := describeError(runErr)
 		m.failJob(jobID, code, message)
 		return
@@ -523,16 +665,17 @@ func (m *Manager) emitRecord(record *core.Record) {
 // toJob converts a PocketBase record into the frontend-facing job.
 func (m *Manager) toJob(record *core.Record) (Job, error) {
 	job := Job{
-		ID:           record.Id,
-		Title:        record.GetString("title"),
-		Prompt:       record.GetString("prompt"),
-		Params:       map[string]any{},
-		Result:       map[string]any{},
-		Status:       record.GetString("status"),
-		ErrorMessage: record.GetString("error_message"),
-		ArtifactIDs:  []string{},
-		Created:      record.GetString("created"),
-		Updated:      record.GetString("updated"),
+		ID:               record.Id,
+		Title:            record.GetString("title"),
+		Prompt:           record.GetString("prompt"),
+		Params:           map[string]any{},
+		Result:           map[string]any{},
+		Status:           record.GetString("status"),
+		ErrorMessage:     record.GetString("error_message"),
+		ArtifactIDs:      []string{},
+		InputArtifactIDs: []string{},
+		Created:          record.GetString("created"),
+		Updated:          record.GetString("updated"),
 	}
 
 	if raw := record.Get("params"); raw != nil {
@@ -557,7 +700,9 @@ func (m *Manager) toJob(record *core.Record) (Job, error) {
 		job.ErrorCode = code
 	}
 
-	// Collect the artifacts the job produced.
+	// Collect the artifacts of the job. The inputs and the outputs are
+	// kept apart, because a retry re-uses the inputs while the outputs
+	// stay with the job that produced them.
 	records, err := m.app.FindRecordsByFilter(
 		CollectionArtifacts,
 		"job = {:job}",
@@ -568,7 +713,12 @@ func (m *Manager) toJob(record *core.Record) (Job, error) {
 	)
 	if err == nil {
 		for _, artifactRecord := range records {
-			job.ArtifactIDs = append(job.ArtifactIDs, artifactRecord.Id)
+			id := artifactRecord.Id
+			if artifactRecord.GetString("kind") == ArtifactKindInput {
+				job.InputArtifactIDs = append(job.InputArtifactIDs, id)
+				continue
+			}
+			job.ArtifactIDs = append(job.ArtifactIDs, id)
 		}
 	}
 

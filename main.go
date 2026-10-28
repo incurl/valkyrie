@@ -85,6 +85,18 @@ func run() error {
 		}),
 	)
 
+	// A job that was running when the application last closed was
+	// never finished and never failed. Nothing would ever pick it up
+	// again, and the user could not even delete it. The reconciliation
+	// marks it as failed, so it appears in the history and can be
+	// cleared.
+	if reconciled, err := jobManager.Reconcile(); err != nil {
+		return fmt.Errorf("reconcile the interrupted jobs: %w", err)
+	} else if reconciled > 0 {
+		consoleLog.Warn("jobs", fmt.Sprintf(
+			"%d job(s) were interrupted by a restart and have been marked as failed", reconciled))
+	}
+
 	appService := bindings.NewAppService(pbService, settings, jobManager, consoleLog)
 
 	// Mount PocketBase's own REST and file API alongside the static
@@ -107,6 +119,11 @@ func run() error {
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+		// The running jobs are stopped when the application closes, so
+		// that a job is never killed in the middle of a write.
+		OnShutdown: func() {
+			jobManager.ShutdownWithTimeout(jobs.ShutdownTimeout)
 		},
 	})
 

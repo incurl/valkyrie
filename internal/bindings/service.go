@@ -139,6 +139,10 @@ func (s *AppService) DeleteJob(jobID string) error {
 }
 
 // RetryJob re-runs a job with the same parameters.
+//
+// Only the **inputs** of the original job are re-used. Its outputs stay
+// with the original job: a retry produces its own results, and moving
+// the outputs would strip the original of them.
 func (s *AppService) RetryJob(jobID string) (jobs.Job, error) {
 	job, err := s.jobs.GetJob(jobID)
 	if err != nil {
@@ -149,7 +153,7 @@ func (s *AppService) RetryJob(jobID string) (jobs.Job, error) {
 		Title:            job.Title,
 		Prompt:           job.Prompt,
 		Params:           job.Params,
-		InputArtifactIDs: job.ArtifactIDs,
+		InputArtifactIDs: job.InputArtifactIDs,
 	}
 	return s.jobs.Submit(context.Background(), request)
 }
