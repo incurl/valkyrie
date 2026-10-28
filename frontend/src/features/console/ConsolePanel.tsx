@@ -44,6 +44,16 @@ export function matchesFilter(entry: ConsoleEntry, filter: LevelFilter): boolean
 }
 
 /**
+ * Counts the entries that report a problem.
+ *
+ * The errors and the warnings are counted together, because both mean
+ * that something needs attention.
+ */
+export function countErrors(entries: ConsoleEntry[]): number {
+  return entries.filter((entry) => entry.level === 'error' || entry.level === 'warn').length;
+}
+
+/**
  * Formats the entry detail for display.
  *
  * A raw API body is pretty printed when it is valid JSON, so that it can
@@ -144,9 +154,7 @@ export function ConsolePanel({ entries, onClear }: ConsolePanelProps) {
   const visible = entries.filter((entry) => matchesFilter(entry, filter));
   const active = visible.find((entry) => entry.id === selected) ?? null;
 
-  const errorCount = entries.filter(
-    (entry) => entry.level === 'error' || entry.level === 'warn',
-  ).length;
+  const errorCount = countErrors(entries);
 
   // The view follows the newest entry, unless the reader scrolled away.
   useLayoutEffect(() => {

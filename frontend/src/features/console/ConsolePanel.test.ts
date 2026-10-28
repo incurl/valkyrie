@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ConsoleEntry } from '../../bindings';
 import {
+  countErrors,
   entriesToText,
   entryToText,
   formatDetail,
@@ -89,6 +90,21 @@ describe('matchesFilter', () => {
   it('shows only the raw bodies for the "raw" filter', () => {
     expect(matchesFilter(entry({ level: 'raw' }), 'raw')).toBe(true);
     expect(matchesFilter(entry({ level: 'info' }), 'raw')).toBe(false);
+  });
+});
+
+describe('countErrors', () => {
+  it('counts the errors and the warnings together', () => {
+    const entries = [
+      entry({ id: 1, level: 'error' }),
+      entry({ id: 2, level: 'warn' }),
+      entry({ id: 3, level: 'info' }),
+    ];
+    expect(countErrors(entries)).toBe(2);
+  });
+
+  it('counts nothing in an empty log', () => {
+    expect(countErrors([])).toBe(0);
   });
 });
 

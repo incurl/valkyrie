@@ -140,6 +140,13 @@ If you write a new copy path, use `writeClipboard` rather than calling `navigato
 If the fallback is used, the hidden textarea must **not** be `display: none` — that makes it unselectable and the copy fails
 silently. Position it off-screen with `opacity: 0` instead.
 
+### The debug console does not appear
+
+The console is hidden by default. It is shown with **Ctrl+Shift+I** or with the **Console** button in the header.
+
+If the shortcut does nothing, another element has the focus and swallowed the key event: the shortcut is matched on
+`window`, so it only works when the event reaches the page. The Command key is accepted as well, for macOS.
+
 ### Clicking a log row collapses the panel while the user is selecting text
 
 A click that ends a text drag fires the row's click handler. The console rows check `hasTextSelection()` before toggling the

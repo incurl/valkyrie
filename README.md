@@ -192,6 +192,15 @@ func init() {
 `frontend/src/features/` holds one panel per concern. Add yours next to
 them and wire it into `frontend/src/app/App.tsx`.
 
+The shell has two things worth knowing about:
+
+- The **debug console** is hidden until it is asked for, with
+  **Ctrl+Shift+I** or with the **Console** button in the header. The
+  button carries the error count, so a failure is visible while the
+  console is closed.
+- The **settings dialog** is tabbed: the credentials are on the
+  *Connection* tab and the interface scale on the *Zoom* tab.
+
 The generated bindings are plain JavaScript with JSDoc types. They are
 re-exported behind a strongly typed surface in `frontend/src/bindings/`,
 so the components never import a generated file directly.

@@ -51,7 +51,7 @@ Wails webview
 │   ├── app/           the shell: layout, data fetching, the event wiring
 │   ├── features/      one panel per concern (submit, queue, console, settings)
 │   ├── bindings/      typed wrappers over the generated bindings
-│   └── ui/            pure helpers (zoom), unit tested
+│   └── ui/            pure helpers (zoom, shortcuts), unit tested
 │
 └──── Wails bindings (primary channel) ───────────────────────┐
         Go: internal/bindings/ → internal/jobs/ → internal/runner/

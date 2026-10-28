@@ -186,11 +186,17 @@ Every size in `frontend/src/styles.css` is therefore expressed in `rem`, so the 
 scale, and is a bug waiting to happen. The factor is also written as a custom property (`--zoom`) and a data attribute
 (`data-zoom`) for the few things that cannot be expressed in `rem`.
 
-The zoom is persisted in `app_settings` under the `ui` key, and restored as soon as the settings load.
+The zoom is persisted in `app_settings` under the `ui` key, and restored as soon as the settings load. It is set from the
+**Zoom** tab of the settings dialog, which is tabbed so that the credentials and the interface scale do not share one form.
 
 ## The console panel is a plain text view
 
 The debug console deliberately shows plain text, not a rich editor. The point is to read a raw API response verbatim.
+
+It is hidden until it is asked for, with **Ctrl+Shift+I** or with the button in the header. The shortcut is matched in the page
+(`frontend/src/ui/shortcuts.ts`), because the webview has no menu bar of its own, and `event.preventDefault()` keeps the
+webview from opening its own inspector on the same keys. The header button carries the error count, so a failure is visible
+while the console is closed.
 
 Three details are load-bearing, and they all come from the webview rather than from the design:
 

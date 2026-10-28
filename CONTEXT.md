@@ -79,7 +79,8 @@ _Avoid_: Hash, Mask, Redacted key
 
 **Debug console**:
 The in-memory log of the application traffic, shown in a panel at the bottom of the window. It is capped at 500 entries and is
-not persisted: it is a debugging aid, not an audit trail.
+not persisted: it is a debugging aid, not an audit trail. It is hidden until it is asked for, with Ctrl+Shift+I or with the
+button in the header.
 _Avoid_: Log viewer, Audit log, DevTools
 
 **Console entry**:

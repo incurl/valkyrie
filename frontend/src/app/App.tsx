@@ -2,8 +2,11 @@
  * The Valkyrie application shell.
  *
  * The layout is a left control rail, a centre canvas and a right
- * sidebar, with the job queue in the header area and the debug console
- * at the bottom.
+ * sidebar, with the job queue in the header area.
+ *
+ * The debug console sits at the bottom of the window. It is hidden
+ * until it is asked for, with Ctrl+Shift+I or with the button in the
+ * header, so that it does not take the room of the panels above it.
  *
  * All backend access goes through the Wails bindings; the frontend never
  * talks to PocketBase or to a remote API directly.
@@ -18,7 +21,8 @@ import '../styles.css';
 import * as api from '../bindings';
 import type { Job } from '../bindings';
 import { applyZoom } from '../ui/zoom';
-import { ConsolePanel } from '../features/console/ConsolePanel';
+import { isConsoleShortcut } from '../ui/shortcuts';
+import { ConsolePanel, countErrors } from '../features/console/ConsolePanel';
 import { JobQueue } from '../features/queue/JobQueue';
 import { SettingsDialog } from '../features/settings/SettingsDialog';
 import { SubmitPanel } from '../features/submit/SubmitPanel';
@@ -35,6 +39,7 @@ function App() {
   const queryClient = useQueryClient();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
 
   // The toast timer is kept so that a second toast replaces the first
@@ -104,6 +109,25 @@ function App() {
       unsubscribe();
     };
   }, [queryClient]);
+
+  // The debug console is shown and hidden with Ctrl+Shift+I. The
+  // shortcut is handled in the page, because the webview has no menu
+  // bar of its own.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isConsoleShortcut(event)) {
+        return;
+      }
+      // The webview would otherwise open its own inspector.
+      event.preventDefault();
+      setConsoleOpen((value) => !value);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
 
   // --- Actions ------------------------------------------------------
 
@@ -193,6 +217,7 @@ function App() {
 
   const jobs = jobsQuery.data ?? [];
   const entries = consoleQuery.data ?? [];
+  const consoleErrors = countErrors(entries);
 
   return (
     <div className="app">
@@ -210,6 +235,19 @@ function App() {
           onRetry={(jobId) => retryMutation.mutate(jobId)}
           onDelete={(jobId) => deleteMutation.mutate(jobId)}
         />
+
+        <button
+          type="button"
+          className={`btn btn-sm${consoleOpen ? ' btn-active' : ''}`}
+          onClick={() => setConsoleOpen((value) => !value)}
+          title="Show or hide the debug console (Ctrl+Shift+I)"
+          aria-pressed={consoleOpen}
+        >
+          Console
+          {consoleErrors > 0 && (
+            <span className="console-error-count"> · {consoleErrors}</span>
+          )}
+        </button>
 
         <button type="button" className="btn btn-sm" onClick={() => setSettingsOpen(true)}>
           Settings
@@ -266,10 +304,12 @@ function App() {
         </section>
       </aside>
 
-      <ConsolePanel
-        entries={entries}
-        onClear={() => clearConsoleMutation.mutate()}
-      />
+      {consoleOpen && (
+        <ConsolePanel
+          entries={entries}
+          onClear={() => clearConsoleMutation.mutate()}
+        />
+      )}
 
       <SettingsDialog
         open={settingsOpen}
