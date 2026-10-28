@@ -263,7 +263,8 @@ fetches it back through PocketBase's file route.
 | [docs/architecture.md](docs/architecture.md) | Why the pieces are shaped the way they are |
 | [docs/porting.md](docs/porting.md) | The checklist for taking this template to a new application |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | The failures that cost time, and what fixes them |
-| [docs/audit.md](docs/audit.md) | The review of the scaffold: the findings and their reproductions |
+| [docs/audit.md](docs/audit.md) | The audit of the scaffold: the defects and their reproductions |
+| [docs/code-review.md](docs/code-review.md) | The code review: design, API and maintainability |
 | [CONTEXT.md](CONTEXT.md) | The vocabulary: what each term means, and what it does not |
 | [AGENTS.md](AGENTS.md) | The working rules for AI coding agents |
 | [.agents/skills/](.agents/skills) | Task-scoped procedures: new application, backend method, migration, frontend panel, release |
